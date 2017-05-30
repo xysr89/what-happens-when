@@ -221,10 +221,14 @@ the form::
 and no payload, and the web browser instead retrieves the HTML from its cache.
 
 Note:
-- If this response starts with 2(OK) it caches cookies, decompresses (if header is mentioning compression) parses 
-  and displays the html content of message body (executing eventual scripts hooked to different DOM elements/events)
-- If the response code starts with 3(Redirection) redirects it the server mentioned in the response 
-- If the response code starts with 5(Server errors) parses the response and displays it to the user
+
+* If this response starts with 2(OK) it caches cookies, decompresses (if header is 
+  mentioning compression) parses and displays the html content of message body 
+  (executing eventual scripts hooked to different DOM elements/events).
+* If the response code starts with 3(Redirection) redirects it the server 
+  mentioned in the response.
+* If the response code starts with 5(Server errors) parses the response 
+  and displays it to the user.
 
 After parsing the HTML, the web browser (and server) repeats this process
 for every resource (image, CSS, favicon.ico, etc) referenced by the HTML page,
