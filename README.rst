@@ -165,17 +165,12 @@ TLS handshake
 * From now on the TLS session transmits the application (HTTP) data encrypted
   with the agreed symmetric key.
   
-.. image:: Picture
+.. image:: TLS.svg
    :target: https://hpbn.co/assets/diagrams/b83b75dbbf5b7e4be31c8000f91fc1a8.svg
 
 HTTP protocol
 -------------
-
-If the web browser used was written by Google, instead of sending an HTTP
-request to retrieve the page, it will send a request to try and negotiate with
-the server an "upgrade" from HTTP to the SPDY protocol.
-
-If the client is using the HTTP protocol and does not support SPDY, it sends a
+If the client is using the HTTP protocol and does not support SPDY (written by Google), it sends a
 request to the server of the form::
 
     GET / HTTP/1.1
