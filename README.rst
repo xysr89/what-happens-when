@@ -5,161 +5,12 @@ This repository is an attempt to answer the age old interview question "What
 happens when you type google.com into your browser's address box and press
 enter?"
 
-Except instead of the usual story, we're going to try to answer this question
-in as much detail as possible. No skipping out on anything.
-
-This is a collaborative process, so dig in and try to help out! There's tons of
-details missing, just waiting for you to add them! So send us a pull request,
-please!
-
-This is all licensed under the terms of the `Creative Commons Zero`_ license.
-
-Read this in `简体中文`_ (simplified Chinese). NOTE: this has not been reviewed
-by the alex/what-happens-when maintainers.
-
 Table of Contents
 ====================
 
 .. contents::
    :backlinks: none
    :local:
-
-The "g" key is pressed
-----------------------
-The following sections explains all about the physical keyboard
-and the OS interrupts. But, a whole lot happens after that which
-isn't explained. When you just press "g" the browser receives the
-event and the entire auto-complete machinery kicks into high gear.
-Depending on your browser's algorithm and if you are in
-private/incognito mode or not various suggestions will be presented
-to you in the dropbox below the URL bar. Most of these algorithms
-prioritize results based on search history and bookmarks. You are
-going to type "google.com" so none of it matters, but a lot of code
-will run before you get there and the suggestions will be refined
-with each key press. It may even suggest "google.com" before you type it.
-
-The "enter" key bottoms out
----------------------------
-
-To pick a zero point, let's choose the Enter key on the keyboard hitting the
-bottom of its range. At this point, an electrical circuit specific to the enter
-key is closed (either directly or capacitively). This allows a small amount of
-current to flow into the logic circuitry of the keyboard, which scans the state
-of each key switch, debounces the electrical noise of the rapid intermittent
-closure of the switch, and converts it to a keycode integer, in this case 13.
-The keyboard controller then encodes the keycode for transport to the computer.
-This is now almost universally over a Universal Serial Bus (USB) or Bluetooth
-connection, but historically has been over PS/2 or ADB connections.
-
-*In the case of the USB keyboard:*
-
-- The USB circuitry of the keyboard is powered by the 5V supply provided over
-  pin 1 from the computer's USB host controller.
-
-- The keycode generated is stored by internal keyboard circuitry memory in a
-  register called "endpoint".
-
-- The host USB controller polls that "endpoint" every ~10ms (minimum value
-  declared by the keyboard), so it gets the keycode value stored on it.
-
-- This value goes to the USB SIE (Serial Interface Engine) to be converted in
-  one or more USB packets that follows the low level USB protocol.
-
-- Those packets are sent by a differential electrical signal over D+ and D-
-  pins (the middle 2) at a maximum speed of 1.5 Mb/s, as an HID
-  (Human Interface Device) device is always declared to be a "low speed device"
-  (USB 2.0 compliance).
-
-- This serial signal is then decoded at the computer's host USB controller, and
-  interpreted by the computer's Human Interface Device (HID) universal keyboard
-  device driver.  The value of the key is then passed into the operating
-  system's hardware abstraction layer.
-
-*In the case of Virtual Keyboard (as in touch screen devices):*
-
-- When the user puts their finger on a modern capacitive touch screen, a
-  tiny amount of current gets transferred to the finger. This completes the
-  circuit through the electrostatic field of the conductive layer and
-  creates a voltage drop at that point on the screen. The
-  ``screen controller`` then raises an interrupt reporting the coordinate of
-  the key press.
-
-- Then the mobile OS notifies the current focused application of a press event
-  in one of its GUI elements (which now is the virtual keyboard application
-  buttons).
-
-- The virtual keyboard can now raise a software interrupt for sending a
-  'key pressed' message back to the OS.
-
-- This interrupt notifies the current focused application of a 'key pressed'
-  event.
-
-
-Interrupt fires [NOT for USB keyboards]
----------------------------------------
-
-The keyboard sends signals on its interrupt request line (IRQ), which is mapped
-to an ``interrupt vector`` (integer) by the interrupt controller. The CPU uses
-the ``Interrupt Descriptor Table`` (IDT) to map the interrupt vectors to
-functions (``interrupt handlers``) which are supplied by the kernel. When an
-interrupt arrives, the CPU indexes the IDT with the interrupt vector and runs
-the appropriate handler. Thus, the kernel is entered.
-
-(On Windows) A ``WM_KEYDOWN`` message is sent to the app
---------------------------------------------------------
-
-The HID transport passes the key down event to the ``KBDHID.sys`` driver which
-converts the HID usage into a scancode. In this case the scan code is
-``VK_RETURN`` (``0x0D``). The ``KBDHID.sys`` driver interfaces with the
-``KBDCLASS.sys`` (keyboard class driver). This driver is responsible for
-handling all keyboard and keypad input in a secure manner. It then calls into
-``Win32K.sys`` (after potentially passing the message through 3rd party
-keyboard filters that are installed). This all happens in kernel mode.
-
-``Win32K.sys`` figures out what window is the active window through the
-``GetForegroundWindow()`` API. This API provides the window handle of the
-browser's address box. The main Windows "message pump" then calls
-``SendMessage(hWnd, WM_KEYDOWN, VK_RETURN, lParam)``. ``lParam`` is a bitmask
-that indicates further information about the keypress: repeat count (0 in this
-case), the actual scan code (can be OEM dependent, but generally wouldn't be
-for ``VK_RETURN``), whether extended keys (e.g. alt, shift, ctrl) were also
-pressed (they weren't), and some other state.
-
-The Windows ``SendMessage`` API is a straightforward function that
-adds the message to a queue for the particular window handle (``hWnd``).
-Later, the main message processing function (called a ``WindowProc``) assigned
-to the ``hWnd`` is called in order to process each message in the queue.
-
-The window (``hWnd``) that is active is actually an edit control and the
-``WindowProc`` in this case has a message handler for ``WM_KEYDOWN`` messages.
-This code looks within the 3rd parameter that was passed to ``SendMessage``
-(``wParam``) and, because it is ``VK_RETURN`` knows the user has hit the ENTER
-key.
-
-(On OS X) A ``KeyDown`` NSEvent is sent to the app
---------------------------------------------------
-
-The interrupt signal triggers an interrupt event in the I/O Kit kext keyboard
-driver. The driver translates the signal into a key code which is passed to the
-OS X ``WindowServer`` process. Resultantly, the ``WindowServer`` dispatches an
-event to any appropriate (e.g. active or listening) applications through their
-Mach port where it is placed into an event queue. Events can then be read from
-this queue by threads with sufficient privileges calling the
-``mach_ipc_dispatch`` function. This most commonly occurs through, and is
-handled by, an ``NSApplication`` main event loop, via an ``NSEvent`` of
-``NSEventType`` ``KeyDown``.
-
-(On GNU/Linux) the Xorg server listens for keycodes
----------------------------------------------------
-
-When a graphical ``X server`` is used, ``X`` will use the generic event
-driver ``evdev`` to acquire the keypress. A re-mapping of keycodes to scancodes
-is made with ``X server`` specific keymaps and rules.
-When the scancode mapping of the key pressed is complete, the ``X server``
-sends the character to the ``window manager`` (DWM, metacity, i3, etc), so the
-``window manager`` in turn sends the character to the focused window.
-The graphical API of the window  that receives the character prints the
-appropriate font symbol in the appropriate focused field.
 
 Parse URL
 ---------
@@ -172,56 +23,20 @@ Parse URL
 
     - ``Resource``  "/"
         Retrieve main (index) page
-
-
-Is it a URL or a search term?
------------------------------
-
-When no protocol or valid domain name is given the browser proceeds to feed
-the text given in the address box to the browser's default web search engine.
-In many cases the URL has a special piece of text appended to it to tell the
-search engine that it came from a particular browser's URL bar.
-
-Convert non-ASCII Unicode characters in hostname
-------------------------------------------------
-
-* The browser checks the hostname for characters that are not in ``a-z``,
-  ``A-Z``, ``0-9``, ``-``, or ``.``.
-* Since the hostname is ``google.com`` there won't be any, but if there were
-  the browser would apply `Punycode`_ encoding to the hostname portion of the
-  URL.
+*  If no protocol or valid domain name is provided, the browser will go by default.
+   If there is any none ASCII code, the browser will apply Punycode encoding to the host name portion of the URL.
 
 Check HSTS list
 ---------------
-* The browser checks its "preloaded HSTS (HTTP Strict Transport Security)"
-  list. This is a list of websites that have requested to be contacted via
-  HTTPS only.
-* If the website is in the list, the browser sends its request via HTTPS
-  instead of HTTP. Otherwise, the initial request is sent via HTTP.
-  (Note that a website can still use the HSTS policy *without* being in the
-  HSTS list.  The first HTTP request to the website by a user will receive a
-  response requesting that the user only send HTTPS requests.  However, this
-  single HTTP request could potentially leave the user vulnerable to a
-  `downgrade attack`_, which is why the HSTS list is included in modern web
-  browsers.)
+The browser checks its HSTS (HTTP Strict Transport Security) list. The websites on this list are requested to be connected by HTTPS
+only; Note: A website can use HSTS policy without being in the HSTS list. This can potential lead to a 
+`downgrade attack`_, which is why the HSTS list is included in modern web
+browsers.)
 
 DNS lookup
 ----------
-
-* Browser checks if the domain is in its cache. (to see the DNS Cache in
-  Chrome, go to `chrome://net-internals/#dns <chrome://net-internals/#dns>`_).
-* If not found, the browser calls ``gethostbyname`` library function (varies by
-  OS) to do the lookup.
-* ``gethostbyname`` checks if the hostname can be resolved by reference in the
-  local ``hosts`` file (whose location `varies by OS`_) before trying to
-  resolve the hostname through DNS.
-* If ``gethostbyname`` does not have it cached nor can find it in the ``hosts``
-  file then it makes a request to the DNS server configured in the network
-  stack. This is typically the local router or the ISP's caching DNS server.
-* If the DNS server is on the same subnet the network library follows the
-  ``ARP process`` below for the DNS server.
-* If the DNS server is on a different subnet, the network library follows
-  the ``ARP process`` below for the default gateway IP.
+Checks local cache first. If not found, call ``gethostbyname`` library function to check if it exist in local hosts file. 
+If still not found, it makes a request to the DNS server. The network library will follow APR process for the DNS server or default gateway IP.
 
 
 ARP process
@@ -252,33 +67,7 @@ If the entry is not in the ARP cache:
     Sender IP: interface.ip.goes.here
     Target MAC: FF:FF:FF:FF:FF:FF (Broadcast)
     Target IP: target.ip.goes.here
-
-Depending on what type of hardware is between the computer and the router:
-
-Directly connected:
-
-* If the computer is directly connected to the router the router responds
-  with an ``ARP Reply`` (see below)
-
-Hub:
-
-* If the computer is connected to a hub, the hub will broadcast the ARP
-  request out all other ports. If the router is connected on the same "wire",
-  it will respond with an ``ARP Reply`` (see below).
-
-Switch:
-
-* If the computer is connected to a switch, the switch will check its local
-  CAM/MAC table to see which port has the MAC address we are looking for. If
-  the switch has no entry for the MAC address it will rebroadcast the ARP
-  request to all other ports.
-
-* If the switch has an entry in the MAC/CAM table it will send the ARP request
-  to the port that has the MAC address we are looking for.
-
-* If the router is on the same "wire", it will respond with an ``ARP Reply``
-  (see below)
-
+    
 ``ARP Reply``::
 
     Sender MAC: target:mac:address:here
@@ -300,8 +89,7 @@ Opening of a socket
 Once the browser receives the IP address of the destination server, it takes
 that and the given port number from the URL (the HTTP protocol defaults to port
 80, and HTTPS to port 443), and makes a call to the system library function
-named ``socket`` and requests a TCP socket stream - ``AF_INET/AF_INET6`` and
-``SOCK_STREAM``.
+named ``socket`` and requests a TCP socket stream.
 
 * This request is first passed to the Transport Layer where a TCP segment is
   crafted. The destination port is added to the header, and a source port is
@@ -314,24 +102,6 @@ named ``socket`` and requests a TCP socket stream - ``AF_INET/AF_INET6`` and
   includes the MAC address of the machine's NIC as well as the MAC address of
   the gateway (local router). As before, if the kernel does not know the MAC
   address of the gateway, it must broadcast an ARP query to find it.
-
-At this point the packet is ready to be transmitted through either:
-
-* `Ethernet`_
-* `WiFi`_
-* `Cellular data network`_
-
-For most home or small business Internet connections the packet will pass from
-your computer, possibly through a local network, and then through a modem
-(MOdulator/DEModulator) which converts digital 1's and 0's into an analog
-signal suitable for transmission over telephone, cable, or wireless telephony
-connections. On the other end of the connection is another modem which converts
-the analog signal back into digital data to be processed by the next `network
-node`_ where the from and to addresses would be analyzed further.
-
-Most larger businesses and some newer residential connections will have fiber
-or direct Ethernet connections in which case the data remains digital and
-is passed directly to the next `network node`_ for processing.
 
 Eventually, the packet will reach the router managing the local subnet. From
 there, it will continue to travel to the autonomous system's (AS) border
@@ -394,6 +164,9 @@ TLS handshake
 
 * From now on the TLS session transmits the application (HTTP) data encrypted
   with the agreed symmetric key.
+  
+.. image:: Picture
+   :target: https://hpbn.co/assets/diagrams/b83b75dbbf5b7e4be31c8000f91fc1a8.svg
 
 HTTP protocol
 -------------
