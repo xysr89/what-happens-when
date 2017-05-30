@@ -165,7 +165,7 @@ TLS handshake
 * From now on the TLS session transmits the application (HTTP) data encrypted
   with the agreed symmetric key.
   
-.. image:: TLS.svg
+.. image:: TLS-Image
    :target: https://hpbn.co/assets/diagrams/b83b75dbbf5b7e4be31c8000f91fc1a8.svg
 
 HTTP protocol
