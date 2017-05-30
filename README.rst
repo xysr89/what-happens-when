@@ -185,6 +185,8 @@ HTTP spec. This also assumes that the web browser is using ``HTTP/1.1``,
 otherwise it may not include the ``Host`` header in the request and the version
 specified in the ``GET`` request will either be ``HTTP/1.0`` or ``HTTP/0.9``.)
 
+If this server has already cached cookies, the browser sends them as cookie headers
+
 HTTP/1.1 defines the "close" connection option for the sender to signal that
 the connection will be closed after completion of the response. For example,
 
@@ -217,6 +219,12 @@ the form::
     [response headers]
 
 and no payload, and the web browser instead retrieves the HTML from its cache.
+
+Note:
+- If this response starts with 2(OK) it caches cookies, decompresses (if header is mentioning compression) parses 
+  and displays the html content of message body (executing eventual scripts hooked to different DOM elements/events)
+- If the response code starts with 3(Redirection) redirects it the server mentioned in the response 
+- If the response code starts with 5(Server errors) parses the response and displays it to the user
 
 After parsing the HTML, the web browser (and server) repeats this process
 for every resource (image, CSS, favicon.ico, etc) referenced by the HTML page,
